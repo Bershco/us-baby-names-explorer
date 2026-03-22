@@ -23,18 +23,36 @@ SELECT name,
        SUM(CASE WHEN gender = 'F' THEN count ELSE 0 END) AS female_births,
        SUM(CASE WHEN gender = 'M' THEN count ELSE 0 END) AS male_births
 FROM baby_names
+WHERE name <> 'Unknown'
 GROUP BY name
 HAVING female_births > 1000
    AND male_births > 1000
 ORDER BY ABS(female_births - male_births), name
 LIMIT 20;
 """.strip(),
-    "Names that disappeared after a certain year": """
-SELECT name, MAX(year) AS last_year_seen
-FROM baby_names
-GROUP BY name
-HAVING MAX(year) <= 1980
-ORDER BY last_year_seen DESC, name
+    "Fastest-rising names from 2000 to 2014": """
+WITH yearly_name_totals AS (
+    SELECT year, name, SUM(count) AS births
+    FROM baby_names
+    WHERE year IN (2000, 2014)
+      AND name <> 'Unknown'
+    GROUP BY year, name
+),
+paired_years AS (
+    SELECT name,
+           MAX(CASE WHEN year = 2000 THEN births END) AS births_2000,
+           MAX(CASE WHEN year = 2014 THEN births END) AS births_2014
+    FROM yearly_name_totals
+    GROUP BY name
+)
+SELECT name,
+       births_2000,
+       births_2014,
+       births_2014 - births_2000 AS growth
+FROM paired_years
+WHERE births_2000 >= 200
+  AND births_2014 IS NOT NULL
+ORDER BY growth DESC, name
 LIMIT 20;
 """.strip(),
 }
