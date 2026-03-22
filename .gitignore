@@ -3,6 +3,7 @@
 
 # reports and info files
 *.txt
+!requirements.txt
 
 # initial csv files (converted to db)
 *.csv
@@ -11,3 +12,6 @@
 # python cache items
 
 __pycache__
+
+# db files
+*.db
