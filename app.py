@@ -21,18 +21,19 @@ growth_by_year AS (
     SELECT name,
            year - 1 AS previous_year,
            year,
+           LAG(births) OVER (PARTITION BY name ORDER BY year) AS previous_year_births,
            births,
            births - LAG(births) OVER (PARTITION BY name ORDER BY year) AS growth
     FROM yearly_name_totals
 )
 SELECT name || '_' || previous_year || '_' || year AS name_year_window,
-       previous_year,
+       previous_year_births,
        growth,
-       year AS current_year
+       births AS current_year_births
 FROM growth_by_year
 WHERE growth IS NOT NULL
   AND births >= 1000
-ORDER BY growth DESC, current_year DESC, name
+ORDER BY growth DESC, year DESC, name
 LIMIT 10;
 """.strip(),
     "Gender-neutral names": """
