@@ -1,5 +1,6 @@
 # markdown files for my own use or codex
 *.md
+!README.md
 
 # reports and info files
 *.txt
