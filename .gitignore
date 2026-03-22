@@ -6,3 +6,8 @@
 
 # initial csv files (converted to db)
 *.csv
+
+
+# python cache items
+
+__pycache__
