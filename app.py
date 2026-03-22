@@ -10,18 +10,28 @@ BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "baby_names.db"
 DEFAULT_QUERY = "SELECT * FROM baby_names LIMIT 10;"
 EXAMPLE_QUERIES = {
-    "Names with the biggest gender gap in 2014": """
+    "Top 10 names with biggest 1-year growth": """
+WITH yearly_name_totals AS (
+    SELECT year, name, SUM(count) AS births
+    FROM baby_names
+    WHERE name <> 'Unknown'
+    GROUP BY year, name
+),
+growth_by_year AS (
+    SELECT name,
+           year,
+           births,
+           births - LAG(births) OVER (PARTITION BY name ORDER BY year) AS growth
+    FROM yearly_name_totals
+)
 SELECT name,
-       SUM(CASE WHEN gender = 'F' THEN count ELSE 0 END) AS female_births,
-       SUM(CASE WHEN gender = 'M' THEN count ELSE 0 END) AS male_births,
-       ABS(SUM(CASE WHEN gender = 'F' THEN count ELSE 0 END) -
-           SUM(CASE WHEN gender = 'M' THEN count ELSE 0 END)) AS gap
-FROM baby_names
-WHERE year = 2014
-  AND name <> 'Unknown'
-GROUP BY name
-HAVING female_births >= 1000 OR male_births >= 1000
-ORDER BY gap DESC, name
+       year,
+       births,
+       growth
+FROM growth_by_year
+WHERE growth IS NOT NULL
+  AND births >= 1000
+ORDER BY growth DESC, year DESC, name
 LIMIT 10;
 """.strip(),
     "Gender-neutral names": """
