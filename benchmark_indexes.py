@@ -67,16 +67,92 @@ QUERY_CASES = (
         params=(2000,),
     ),
     QueryCase(
-        name="disappeared_after_year",
+        name="gender_split",
         sql="""
-        SELECT name, MAX(year) AS last_year_seen
+        SELECT year,
+               SUM(CASE WHEN gender = 'F' THEN count ELSE 0 END) AS female_births,
+               SUM(CASE WHEN gender = 'M' THEN count ELSE 0 END) AS male_births
         FROM baby_names
+        WHERE name = ?
+        GROUP BY year
+        ORDER BY year;
+        """,
+        params=("Ashley",),
+    ),
+    QueryCase(
+        name="gender_neutral_example",
+        sql="""
+        SELECT name,
+               SUM(CASE WHEN gender = 'F' THEN count ELSE 0 END) AS female_births,
+               SUM(CASE WHEN gender = 'M' THEN count ELSE 0 END) AS male_births
+        FROM baby_names
+        WHERE name <> 'Unknown'
         GROUP BY name
-        HAVING MAX(year) <= ?
-        ORDER BY last_year_seen DESC, name
+        HAVING female_births > 1000
+           AND male_births > 1000
+        ORDER BY ABS(female_births - male_births), name
         LIMIT 20;
         """,
-        params=(1980,),
+        params=(),
+    ),
+    QueryCase(
+        name="growth_1y_example",
+        sql="""
+        WITH yearly_name_totals AS (
+            SELECT year, name, SUM(count) AS births
+            FROM baby_names
+            WHERE name <> 'Unknown'
+            GROUP BY year, name
+        ),
+        growth_by_year AS (
+            SELECT name,
+                   year - 1 AS previous_year,
+                   year,
+                   LAG(births) OVER (PARTITION BY name ORDER BY year) AS previous_year_births,
+                   births,
+                   births - LAG(births) OVER (PARTITION BY name ORDER BY year) AS growth
+            FROM yearly_name_totals
+        )
+        SELECT name || '_' || previous_year || '_' || year AS name_year_window,
+               previous_year_births,
+               growth,
+               births AS current_year_births
+        FROM growth_by_year
+        WHERE growth IS NOT NULL
+          AND births >= 1000
+        ORDER BY growth DESC, year DESC, name
+        LIMIT 10;
+        """,
+        params=(),
+    ),
+    QueryCase(
+        name="growth_2000_2014_example",
+        sql="""
+        WITH yearly_name_totals AS (
+            SELECT year, name, SUM(count) AS births
+            FROM baby_names
+            WHERE year IN (2000, 2014)
+              AND name <> 'Unknown'
+            GROUP BY year, name
+        ),
+        paired_years AS (
+            SELECT name,
+                   MAX(CASE WHEN year = 2000 THEN births END) AS births_2000,
+                   MAX(CASE WHEN year = 2014 THEN births END) AS births_2014
+            FROM yearly_name_totals
+            GROUP BY name
+        )
+        SELECT name,
+               births_2000,
+               births_2014,
+               births_2014 - births_2000 AS growth
+        FROM paired_years
+        WHERE births_2000 >= 200
+          AND births_2014 IS NOT NULL
+        ORDER BY growth DESC, name
+        LIMIT 20;
+        """,
+        params=(),
     ),
 )
 
@@ -84,10 +160,10 @@ QUERY_CASES = (
 INDEX_VARIANTS = (
     IndexVariant(name="no_indexes", statements=()),
     IndexVariant(
-        name="old_indexes",
+        name="previous_two_indexes",
         statements=(
-            "CREATE INDEX idx_baby_names_name_year ON baby_names (name, year)",
-            "CREATE INDEX idx_baby_names_year_gender_count ON baby_names (year, gender, count DESC)",
+            "CREATE INDEX idx_baby_names_name_year_count ON baby_names (name, year, count)",
+            "CREATE INDEX idx_baby_names_year_name_count ON baby_names (year, name, count)",
         ),
     ),
     IndexVariant(
@@ -95,6 +171,7 @@ INDEX_VARIANTS = (
         statements=(
             "CREATE INDEX idx_baby_names_name_year_count ON baby_names (name, year, count)",
             "CREATE INDEX idx_baby_names_year_name_count ON baby_names (year, name, count)",
+            "CREATE INDEX idx_baby_names_name_year_gender_count ON baby_names (name, year, gender, count)",
         ),
     ),
 )

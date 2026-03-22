@@ -16,9 +16,8 @@ That means:
 
 ## Main files
 
-- `run_app.py`: local launcher; preferred way to start the project
 - `app.py`: Streamlit app entry point
-- `task_1_1_load_names.py`: SQLite database builder and validation logic
+- `task_1_1_load_names.py`: SQLite database builder, validation logic, and rebuild CLI
 - `NationalNames.csv`: source dataset
 - `index_justification.txt`: explanation of the chosen indexes
 - `benchmark_indexes.py`: benchmark script for index comparisons
@@ -35,26 +34,35 @@ pip install -r requirements.txt
 Run the app:
 
 ```bash
-python3 run_app.py
+streamlit run app.py
 ```
 
 Force a full database rebuild:
 
 ```bash
-python3 run_app.py --rebuild-db
+python3 task_1_1_load_names.py --rebuild-db
 ```
 
 What happens on startup:
 
-1. The launcher checks for `baby_names.db`.
+1. `app.py` calls `ensure_database()` from `task_1_1_load_names.py`.
 2. If the database already exists and has the expected schema, data, and indexes, it is reused.
-3. If the database is missing or invalid, it is rebuilt from `NationalNames.csv`.
-4. Streamlit starts the app.
+3. If the database exists but is missing required indexes, the missing indexes are added in place.
+4. If the database is missing or invalid, it is rebuilt from `NationalNames.csv`.
+5. Streamlit starts the app.
+
+Current SQL example buttons:
+
+- `Top 10 names with biggest 1-year growth`
+- `Gender-neutral names`
+- `Fastest-rising names from 2000 to 2014`
+
+The gender-neutral preset excludes the placeholder value `Unknown`, and the 1-year-growth preset returns a compact comparison row with the year window embedded into the name field.
 
 The project includes:
 
 - SQLite loading and schema creation
-- two justified indexes
+- three justified indexes
 - an interactive Streamlit explorer
 - a safe read-only SQL panel
 - built-in example queries

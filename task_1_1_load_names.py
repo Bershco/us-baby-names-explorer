@@ -1,8 +1,6 @@
-import csv
 import argparse
-import os
+import csv
 import sqlite3
-import sys
 from pathlib import Path
 
 
@@ -23,16 +21,20 @@ CREATE TABLE baby_names (
 """
 
 
-INDEX_STATEMENTS = [
-    """
+INDEX_STATEMENTS = {
+    "idx_baby_names_name_year_count": """
     CREATE INDEX idx_baby_names_name_year_count
     ON baby_names (name, year, count);
     """,
-    """
+    "idx_baby_names_year_name_count": """
     CREATE INDEX idx_baby_names_year_name_count
     ON baby_names (year, name, count);
     """,
-]
+    "idx_baby_names_name_year_gender_count": """
+    CREATE INDEX idx_baby_names_name_year_gender_count
+    ON baby_names (name, year, gender, count);
+    """,
+}
 
 
 INSERT_SQL = """
@@ -40,10 +42,7 @@ INSERT INTO baby_names (id, name, year, gender, count)
 VALUES (?, ?, ?, ?, ?);
 """
 
-EXPECTED_INDEXES = {
-    "idx_baby_names_name_year_count",
-    "idx_baby_names_year_name_count",
-}
+EXPECTED_INDEXES = tuple(INDEX_STATEMENTS)
 
 
 def recreate_database() -> sqlite3.Connection:
@@ -111,9 +110,44 @@ def load_csv(connection: sqlite3.Connection) -> int:
 
 
 def create_indexes(connection: sqlite3.Connection) -> None:
-    for statement in INDEX_STATEMENTS:
+    for statement in INDEX_STATEMENTS.values():
         connection.execute(statement)
     connection.commit()
+
+
+def get_existing_indexes(connection: sqlite3.Connection) -> set[str]:
+    rows = connection.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'baby_names';"
+    ).fetchall()
+    return {row[0] for row in rows}
+
+
+def get_missing_indexes(connection: sqlite3.Connection) -> list[str]:
+    existing_indexes = get_existing_indexes(connection)
+    return [index_name for index_name in EXPECTED_INDEXES if index_name not in existing_indexes]
+
+
+def core_database_is_ready(connection: sqlite3.Connection) -> bool:
+    table_row = connection.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'baby_names';"
+    ).fetchone()
+    if table_row is None:
+        return False
+
+    count_row = connection.execute("SELECT COUNT(*) FROM baby_names;").fetchone()
+    return count_row is not None and count_row[0] > 0
+
+
+def ensure_missing_indexes(connection: sqlite3.Connection) -> bool:
+    missing_indexes = get_missing_indexes(connection)
+    if not missing_indexes:
+        return False
+
+    print(f"Creating missing indexes: {', '.join(missing_indexes)}")
+    for index_name in missing_indexes:
+        connection.execute(INDEX_STATEMENTS[index_name])
+    connection.commit()
+    return True
 
 
 def database_is_ready() -> bool:
@@ -122,21 +156,9 @@ def database_is_ready() -> bool:
 
     connection = sqlite3.connect(DB_PATH)
     try:
-        table_row = connection.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'baby_names';"
-        ).fetchone()
-        if table_row is None:
+        if not core_database_is_ready(connection):
             return False
-
-        count_row = connection.execute("SELECT COUNT(*) FROM baby_names;").fetchone()
-        if count_row is None or count_row[0] == 0:
-            return False
-
-        index_rows = connection.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'baby_names';"
-        ).fetchall()
-        present_indexes = {row[0] for row in index_rows}
-        return EXPECTED_INDEXES.issubset(present_indexes)
+        return not get_missing_indexes(connection)
     except sqlite3.Error:
         return False
     finally:
@@ -144,9 +166,20 @@ def database_is_ready() -> bool:
 
 
 def ensure_database(force_rebuild: bool = False) -> bool:
-    if not force_rebuild and database_is_ready():
-        print(f"Database already exists and is ready: {DB_PATH.name}")
-        return False
+    if not force_rebuild and DB_PATH.exists():
+        connection = sqlite3.connect(DB_PATH)
+        try:
+            if core_database_is_ready(connection):
+                indexes_created = ensure_missing_indexes(connection)
+                if indexes_created:
+                    print(f"Database already existed; added missing indexes to {DB_PATH.name}")
+                else:
+                    print(f"Database already exists and is ready: {DB_PATH.name}")
+                return indexes_created
+        except sqlite3.Error:
+            pass
+        finally:
+            connection.close()
 
     if not CSV_PATH.exists():
         raise FileNotFoundError(
@@ -167,11 +200,6 @@ def ensure_database(force_rebuild: bool = False) -> bool:
         return True
     finally:
         connection.close()
-
-
-def launch_streamlit_app() -> None:
-    command = [sys.executable, "-m", "streamlit", "run", str(BASE_DIR / "app.py")]
-    os.execvp(command[0], command)
 
 
 def main() -> None:
