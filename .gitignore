@@ -1,0 +1,8 @@
+# markdown files for my own use or codex
+*.md
+
+# reports and info files
+*.txt
+
+# initial csv files (converted to db)
+*.csv
