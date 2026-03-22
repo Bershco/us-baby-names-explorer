@@ -23,8 +23,6 @@ That means:
 - `index_justification.txt`: explanation of the chosen indexes
 - `benchmark_indexes.py`: benchmark script for index comparisons
 - `task_1_3_report.txt`: required pattern-discovery report
-- `PROJECT_SUMMARY.md`: full assignment summary
-- `DEPLOYMENT.md`: deployment notes
 
 ## Local usage
 
@@ -53,30 +51,6 @@ What happens on startup:
 3. If the database is missing or invalid, it is rebuilt from `NationalNames.csv`.
 4. Streamlit starts the app.
 
-## Streamlit Cloud
-
-For Streamlit Cloud, set the app entry point to:
-
-```text
-app.py
-```
-
-`app.py` also triggers the same database-preparation logic, which is necessary because Streamlit Cloud launches a Streamlit script directly rather than a custom launcher script.
-
-Important practical note:
-
-- This repo-friendly approach works because `NationalNames.csv` is about `43 MB`, which fits GitHub's file-size constraints.
-- `baby_names.db` is about `110 MB`, which is why it is excluded from the repository.
-
-## Git ignore rules
-
-Generated artifacts are excluded in `.gitignore`:
-
-- `baby_names.db`
-- `__pycache__/`
-
-## Assignment coverage
-
 The project includes:
 
 - SQLite loading and schema creation
@@ -86,5 +60,3 @@ The project includes:
 - built-in example queries
 - additional visualizations
 - three documented patterns discovered from the data
-
-For the full requirement-by-requirement explanation, see `PROJECT_SUMMARY.md`.
