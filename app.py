@@ -3,6 +3,7 @@ from numbers import Number
 from pathlib import Path
 
 import streamlit as st
+from task_1_1_load_names import ensure_database
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -38,6 +39,11 @@ LIMIT 20;
 """.strip(),
 }
 READ_ONLY_ERROR = "Only read-only SELECT queries are allowed."
+
+
+@st.cache_resource(show_spinner="Preparing SQLite database...")
+def prepare_database() -> None:
+    ensure_database()
 
 
 def get_connection() -> sqlite3.Connection:
@@ -424,8 +430,14 @@ def main() -> None:
     st.title("Baby Names SQL Explorer")
     st.write("Explore baby names with a popularity chart and a safe SQL query panel.")
 
+    try:
+        prepare_database()
+    except FileNotFoundError as exc:
+        st.error(str(exc))
+        return
+
     if not DB_PATH.exists():
-        st.error(f"Database file not found: {DB_PATH.name}")
+        st.error("Database initialization failed.")
         return
 
     render_name_popularity_section()
